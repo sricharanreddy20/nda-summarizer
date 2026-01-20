@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}Home - RAG System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h3>Document Q&A System</h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <p>Welcome to the Document Q&A System! You can:</p>
+                    <ul>
+                        <li>Upload documents and ask questions about them</li>
+                        <li>Get AI-powered answers based on your documents</li>
+                        <li><a href="{{ url_for('notes') }}">Access the Notes section</a> (requires login)</li>
+                    </ul>
+                </div>
+
+                <form id="upload-form" class="mb-4">
+                    <div class="mb-3">
+                        <label for="document" class="form-label">Upload Document</label>
+                        <input type="file" class="form-control" id="document" name="document" accept=".txt,.pdf,.doc,.docx,.csv,.xlsx,.xls">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Upload</button>
+                </form>
+
+                <!-- NDA Analysis Tools -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>NDA Analysis Tools</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Upload an NDA document and use these specialized analysis tools:</p>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-outline-primary" onclick="askNdaQuestion('Summarize this NDA')">
+                                Summarize NDA
+                            </button>
+                            <button class="btn btn-outline-primary" onclick="askNdaQuestion('Simplify key clauses in this NDA')">
+                                Simplify Key Clauses
+                            </button>
+                            <button class="btn btn-outline-primary" onclick="askNdaQuestion('Identify risks in this NDA')">
+                                Identify Risks
+                            </button>
+                            <button class="btn btn-outline-primary" onclick="askNdaQuestion('Suggest improvements for this NDA')">
+                                Suggest Improvements
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-container mb-3" id="chat-messages">
+                    <!-- Messages will be displayed here -->
+                </div>
+
+                <form id="question-form">
+                    <div class="input-group">
+                        <input type="text" class="form-control" id="question" placeholder="Ask a question about the document..." required>
+                        <button class="btn btn-primary" type="submit">Ask</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('upload-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData();
+    const fileInput = document.getElementById('document');
+    formData.append('document', fileInput.files[0]);
+    
+    try {
+        const response = await fetch('/upload_document', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        if (result.success) {
+            addMessage('System', 'Document uploaded and processed successfully!', false);
+        } else {
+            addMessage('System', 'Error: ' + result.error, false);
+        }
+    } catch (error) {
+        addMessage('System', 'Error uploading document: ' + error, false);
+    }
+});
+
+document.getElementById('question-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const questionInput = document.getElementById('question');
+    const question = questionInput.value;
+    
+    addMessage('You', question, true);
+    questionInput.value = '';
+    
+    try {
+        const response = await fetch('/ask_question', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'question=' + encodeURIComponent(question)
+        });
+        
+        const result = await response.json();
+        addMessage('Assistant', result.answer, false);
+    } catch (error) {
+        addMessage('System', 'Error getting answer: ' + error, false);
+    }
+});
+
+function addMessage(sender, message, isUser) {
+    const chatMessages = document.getElementById('chat-messages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+    
+    if (isUser) {
+        messageDiv.innerHTML = `<strong>${sender}:</strong> <span>${message}</span>`;
+    } else {
+        const formattedContent = document.createElement('div');
+        formattedContent.className = 'formatted-content';
+        formattedContent.style.marginTop = '10px';
+        
+        formattedContent.innerHTML = message;
+        
+        messageDiv.innerHTML = `<strong>${sender}:</strong>`;
+        messageDiv.appendChild(formattedContent);
+    }
+    
+    chatMessages.appendChild(messageDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function askNdaQuestion(question) {
+    addMessage('You', question, true);
+    
+    try {
+        fetch('/ask_question', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'question=' + encodeURIComponent(question)
+        })
+        .then(response => response.json())
+        .then(result => {
+            addMessage('Assistant', result.answer, false);
+        });
+    } catch (error) {
+        addMessage('System', 'Error getting answer: ' + error, false);
+    }
+}
+</script>
+{% endblock %} 
